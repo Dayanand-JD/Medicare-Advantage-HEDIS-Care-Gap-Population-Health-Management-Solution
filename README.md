@@ -1,2 +1,114 @@
 # Medicare-Advantage-HEDIS-Care-Gap-Population-Health-Management-Solution
 US Healthcare — Medicare Advantage Quality (NCQA HEDIS / CMS Star Ratings) &amp; Care Management
+# Medicare Advantage HEDIS Care-Gap & Population Health Management (PHM) Solution
+
+![SQL Server](https://img.shields.io/badge/Database-Microsoft%20SQL%20Server-CC2927?style=flat-square&logo=microsoftsqlserver)
+![Power BI](https://img.shields.io/badge/BI-Power%20BI%20Desktop-F2C811?style=flat-square&logo=powerbi&logoColor=black)
+![Domain](https://img.shields.io/badge/Domain-US%20Healthcare%20%7C%20Medicare%20Advantage-004F53?style=flat-square)
+![Standards](https://img.shields.io/badge/Quality-NCQA%20HEDIS%20%26%20CMS%20Stars-2E7D32?style=flat-square)
+![Role](https://img.shields.io/badge/Role-Business%20Analysis%20%2B%20Data%20Analytics-37474F?style=flat-square)
+
+An end-to-end **Business Analysis & Population Health Management (PHM)** solution built for a simulated US Medicare Advantage health plan. This project translates **NCQA HEDIS** technical specifications into a complete **Business Requirements Document (BRD)**, relational **ER Diagram**, **18-scenario UAT test suite**, production **T-SQL care-gap views**, and an interactive **3-page Power BI Care Management Dashboard**.
+
+---
+
+## Business Problem & Strategic Objective
+
+A regional Medicare Advantage (MA) plan holds a **3.5-Star CMS Rating**, falling short of the **4.0-Star threshold** required to unlock CMS Quality Bonus Payments (QBPs). Operational review identified three core bottlenecks:
+1. **Fragmented Clinical & Claims Data:** Member eligibility, claims utilization, SNOMED diagnoses, and LOINC lab/vital records live in disconnected tables with no unified care-gap logic.
+2. **Reactive Quality Reporting:** Open preventive care gaps for high-weight chronic measures (**Diabetes GSD** and **Hypertension CBP**) are surfaced too late in the measurement year to intervene.
+3. **Unprioritized Care Management Outreach:** Care managers lack a single risk-stratified queue combining open HEDIS gaps, acute utilization (ED/Inpatient), and **Social Determinants of Health (SDOH)** barriers.
+
+**Solution:** An automated **MSSQL + Power BI** PHM pipeline that identifies audit-ready HEDIS care gaps, calculates a 0–100 composite member risk score, routes members to tailored Next Best Action interventions, and lets Quality Directors simulate exact gap closures needed to reach **4.0 and 5.0 CMS Stars**.
+
+---
+
+## Business Analysis Artifacts (Deliverables)
+
+| Artifact | Purpose | File Link |
+| :--- | :--- | :--- |
+| **Business Requirements Document (BRD)** | Scope, stakeholder personas, NCQA measure specs, 10 Functional Requirements (`FR-01`–`FR-10`), 5 NFRs, 4 Gherkin User Stories, and sign-off | [`01_BA_Documentation/BRD_HEDIS_CareGap_PHM.pdf`](01_BA_Documentation/BRD_HEDIS_CareGap_PHM.pdf) |
+| **Relational ER Diagram** | 8-table SQL Server schema with PK/FK relationships, performance indexes, and SDOH enrichment joins | [`01_BA_Documentation/ER_Diagram_PHM_Schema.png`](01_BA_Documentation/ER_Diagram_PHM_Schema.png) |
+| **UAT Test Suite & Sign-Off Tracker** | 18 test cases (`TC-01`–`TC-18`) mapped 1-to-1 to `FR-01`–`FR-10` with dynamic pass-rate scorecards | [`01_BA_Documentation/UAT_Test_Cases_HEDIS.xlsx`](01_BA_Documentation/UAT_Test_Cases_HEDIS.xlsx) |
+| **T-SQL Schema & HEDIS Engine** | DDL, dynamic config (`dbo.phm_config`), HEDIS GSD & CBP views, SDOH scoring, and master PHM reporting view | [`02_SQL_Server_Scripts/`](02_SQL_Server_Scripts/) |
+| **3-Page Power BI Dashboard** | Executive Star Rating Simulator, Nurse Care Management Outreach Worklist, and SDOH Equity Analysis | [`03_PowerBI_Dashboard/PHM_HEDIS_Dashboard.pbix`](03_PowerBI_Dashboard/PHM_HEDIS_Dashboard.pbix) |
+
+---
+
+## Solution Architecture & Clinical Logic
+
+![ER Diagram](01_BA_Documentation/ER_Diagram_PHM_Schema.png)
+
+### 1. NCQA HEDIS Measure Specifications (T-SQL Views)
+
+| Measure | SQL View | Eligible Denominator | Clinical Exclusions | Compliance & Tie-Breaking Rules |
+| :--- | :--- | :--- | :--- | :--- |
+| **GSD** *(Glycemic Status Assessment — Diabetes)* | `dbo.vw_HEDIS_GSD_CareGaps` | Active members aged **18–75** with Type 1/2 Diabetes active in MY or MY-1 | Deceased, Hospice, Palliative Care | Latest MY HbA1c (`LOINC 4548-4`, `17855-8`, `17856-6`, `4549-2`); **same-day ties broken by lowest value**; Compliant `< 8.0%`, Watchlist `8.0%–9.0%`, Open Gap `> 9.0%` or Missing |
+| **CBP** *(Controlling High Blood Pressure)* | `dbo.vw_HEDIS_CBP_CareGaps` | Active members aged **18–85** with Hypertension (`SNOMED 59621000`) active in MY or MY-1 | Deceased, Hospice, Palliative, ESRD/Dialysis, Kidney Transplant, Pregnancy | Requires **paired** Systolic (`8480-6`) & Diastolic (`8462-4`) on the same date on/after diagnosis; **lowest same-day Sys/Dia** selected; Compliant `< 140/90 mmHg` |
+
+### 2. Composite Risk Stratification (0–100 Scale) & Outreach Routing (`dbo.vw_PHM_Member_Summary`)
+
+* **Weighted Risk Points:** Open GSD Gap (`+20`), Open CBP Gap (`+15`), `>= 2` ED Visits (`+25`) or `1` ED Visit (`+12`), `>= 1` Inpatient Admission (`+20`), `>= 5` Active Chronic Conditions (`+10`), High SDOH Vulnerability (`+10`) or Medium SDOH (`+5`).
+* **Risk Tiers:** **High Risk** (`>= 45`), **Medium Risk** (`20–44`), **Low Risk** (`< 20`).
+* **Automated Next Best Action (`Recommended_Intervention`):**
+  1. **Priority 1:** `>= 2` Open Gaps + Transit Barrier (`SVI >= 0.65`) → *Nurse Care Manager Call + Ride-Share / Mobile Phlebotomy*
+  2. **Priority 1:** `>= 1` Open Gap + Recent ED/Inpatient Event → *Transitional Care Management (TCM) + PCP Follow-up*
+  3. **Priority 2:** Open GSD Gap → *Schedule HbA1c Lab & Diabetes Educator Outreach*
+  4. **Priority 2:** Open CBP Gap → *Home BP Cuff Dispatch & Telehealth Medication Review*
+  5. **Priority 3:** Age `>= 65` & Zero Wellness Visits → *Annual Wellness Visit (AWV) Reminder Campaign*
+
+---
+
+## Power BI Dashboard Highlights
+
+### Page 1 — Executive Quality & CMS Star Rating Overview
+* KPI cards for Active Adult Members, GSD & CBP Compliance %, Total Open Care Gaps, and Estimated PMPM Spend.
+* **Interactive DAX What-If Simulator:** Compares live compliance rates against simulated CMS **4-Star (78%)** and **5-Star (85%)** cut-points and dynamically calculates the exact number of member gaps needed to hit target.
+
+![Executive Quality & Star Rating Dashboard](03_PowerBI_Dashboard/screenshots/page1_executive_stars.png)
+
+### Page 2 — Care Management Outreach Worklist
+* Operational nurse queue plotting **Annual Claim Spend vs. Open Care Gaps & ED Visits** with slicers for Risk Tier, Measure Status, SDOH Risk, and Attributed PCP.
+* Drill-through member action table surfacing latest HbA1c/BP readings, primary SDOH barrier, and assigned intervention priority.
+
+![Care Management Outreach Worklist](03_PowerBI_Dashboard/screenshots/page2_care_management_worklist.png)
+
+### Page 3 — Population Health & SDOH Equity Analysis
+* Geographic concentration of open gaps by City/ZIP alongside compliance disparity comparisons across SDOH Vulnerability Tiers and Age Bands.
+
+![SDOH Equity Analysis](03_PowerBI_Dashboard/screenshots/page3_sdoh_equity.png)
+
+---
+
+## UAT Validation Highlights
+
+All clinical rules and edge cases were validated across **18 structured UAT test cases** (`TC-01`–`TC-18`) covering:
+* **Age Boundaries:** Strictly excluding age 76 from GSD (`TC-01`) and including age 18 (`TC-02`).
+* **Clinical Exclusions:** Removing Hospice, Palliative, ESRD/Dialysis, Pregnancy, Deceased, and Pediatric (`< 18`) records (`TC-03`, `TC-08`, `TC-13`).
+* **NCQA Precision Rules:** Same-day lowest-value tie-breaking (`TC-05`, `TC-10`), rejecting prior-year-only labs (`TC-06`), ignoring pre-diagnosis BP readings (`TC-11`), and rejecting unpaired systolic/diastolic vitals (`TC-12`).
+* **Dynamic Rollover & DAX Accuracy:** Verifying zero hardcoded years via `dbo.phm_config` (`TC-18`) and exact 4-Star gap-to-target math (`TC-17`).
+
+---
+
+## Repository Structure
+
+```text
+medicare-advantage-hedis-phm-dashboard/
+├── 01_BA_Documentation/
+│   ├── BRD_HEDIS_CareGap_PHM.pdf
+│   ├── ER_Diagram_PHM_Schema.dbml
+│   ├── ER_Diagram_PHM_Schema.png
+│   └── UAT_Test_Cases_HEDIS.xlsx
+├── 02_SQL_Server_Scripts/
+│   ├── 01_schema_ddl.sql
+│   ├── 02_hedis_gsd_care_gaps.sql
+│   ├── 03_hedis_cbp_care_gaps.sql
+│   ├── 04_sdoh_enrichment.sql
+│   └── 05_phm_risk_and_outreach_view.sql
+├── 03_PowerBI_Dashboard/
+│   ├── PHM_HEDIS_Dashboard.pbix
+│   └── screenshots/
+│       ├── page1_executive_stars.png
+│       ├── page2_care_management_worklist.png
+│       └── page3_sdoh_equity.png
+└── README.md
