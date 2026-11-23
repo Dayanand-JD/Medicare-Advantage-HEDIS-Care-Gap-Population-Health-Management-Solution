@@ -112,7 +112,7 @@ medicare-advantage-hedis-phm-dashboard/
 **Dayanand Jola Dinakar**  
 *Business & Data Analyst | MS in Computer Science (AI Systems & ML Engineering) | MSc in Computing & IT Management*  
 * **Email:** imdayanandjd@gmail.com  
-* **LinkedIn:** [linkedin.com/in/your-profile](https://linkedin.com)  
-* **GitHub:** [github.com/your-username](https://github.com)
+* **LinkedIn:** [linkedin.com/in/dayanand_jd](https://www.linkedin.com/in/dayanandjd/)  
+* **GitHub:** [github.com/Dayanand-JD](https://github.com/Dayanand-JD)
 
 > **Data Privacy Notice:** All patient, provider, and claims records used in this repository are 100% synthetic data and contain zero Protected Health Information (PHI).
