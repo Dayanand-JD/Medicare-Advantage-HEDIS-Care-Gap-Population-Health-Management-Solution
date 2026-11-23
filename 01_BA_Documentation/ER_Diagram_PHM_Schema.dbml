@@ -1,0 +1,172 @@
+// ============================================================================
+// Medicare Advantage HEDIS Care-Gap & Population Health Management (PHM)
+// Relational Schema for Microsoft SQL Server (MedicareAdvantage_PHM)
+// Paste directly into https://dbdiagram.io/d
+// ============================================================================
+
+Project MedicareAdvantage_PHM {
+  database_type: 'SQL Server'
+  Note: '''
+    # Medicare Advantage PHM & HEDIS Care-Gap Schema
+    Supports NCQA HEDIS GSD (Diabetes) & CBP (Hypertension) compliance views,
+    ZIP-level SDOH vulnerability enrichment, PCP attribution, and composite
+    member risk stratification feeding Power BI.
+  '''
+}
+
+Table patients [headercolor: #004F53] {
+  Id varchar(50) [pk, not null, note: 'Unique Member UUID (Synthea)']
+  BIRTHDATE date [not null]
+  DEATHDATE date [null, note: 'Used to exclude deceased members from active PHM & HEDIS']
+  SSN varchar(20) [null, note: 'Masked in non-clinical production views (HIPAA)']
+  DRIVERS varchar(50) [null]
+  PASSPORT varchar(50) [null]
+  PREFIX varchar(20) [null]
+  FIRST varchar(100) [null]
+  LAST varchar(100) [null]
+  SUFFIX varchar(20) [null]
+  MAIDEN varchar(100) [null]
+  MARITAL varchar(10) [null]
+  RACE varchar(50) [null]
+  ETHNICITY varchar(50) [null]
+  GENDER varchar(10) [null]
+  BIRTHPLACE varchar(200) [null]
+  ADDRESS varchar(200) [null]
+  CITY varchar(100) [null]
+  STATE varchar(50) [null]
+  COUNTY varchar(100) [null]
+  ZIP varchar(20) [null, note: 'Joins to sdoh_zip_index.ZIP']
+  LAT decimal(10,6) [null]
+  LON decimal(10,6) [null]
+  HEALTHCARE_EXPENSES decimal(14,2) [null]
+  HEALTHCARE_COVERAGE decimal(14,2) [null]
+  INCOME decimal(14,2) [null]
+}
+
+Table providers [headercolor: #004F53] {
+  Id varchar(50) [pk, not null, note: 'Unique Provider UUID']
+  ORGANIZATION varchar(50) [null]
+  NAME varchar(150) [null]
+  GENDER varchar(10) [null]
+  SPECIALITY varchar(150) [null]
+  ADDRESS varchar(200) [null]
+  CITY varchar(100) [null]
+  STATE varchar(50) [null]
+  ZIP varchar(20) [null]
+  LAT decimal(10,6) [null]
+  LON decimal(10,6) [null]
+  UTILIZATION int [null]
+}
+
+Table encounters [headercolor: #00696D] {
+  Id varchar(50) [pk, not null]
+  START datetimeoffset [not null, note: 'ISO-8601 UTC timestamp']
+  STOP datetimeoffset [null]
+  PATIENT varchar(50) [not null]
+  ORGANIZATION varchar(50) [null]
+  PROVIDER varchar(50) [null, note: 'Used for latest outpatient/wellness PCP attribution']
+  PAYER varchar(50) [null]
+  ENCOUNTERCLASS varchar(50) [null, note: 'ambulatory | emergency | inpatient | wellness']
+  CODE varchar(50) [null]
+  DESCRIPTION varchar(300) [null]
+  BASE_ENCOUNTER_COST decimal(12,2) [null]
+  TOTAL_CLAIM_COST decimal(12,2) [null, note: 'Aggregated for Annual Spend & PMPM']
+  PAYER_COVERAGE decimal(12,2) [null]
+  REASONCODE varchar(50) [null]
+  REASONDESCRIPTION varchar(300) [null]
+
+  indexes {
+    (PATIENT, START) [name: 'IX_Encounters_Patient_Start']
+  }
+}
+
+Table conditions [headercolor: #00696D] {
+  ConditionRowID bigint [pk, increment]
+  START date [not null]
+  STOP date [null]
+  PATIENT varchar(50) [not null]
+  ENCOUNTER varchar(50) [null]
+  CODE varchar(50) [not null, note: 'SNOMED-CT (e.g., 59621000 Hypertension)']
+  DESCRIPTION varchar(300) [null, note: 'Diabetes, Hypertension, Hospice, ESRD, Pregnancy']
+
+  indexes {
+    (PATIENT, CODE) [name: 'IX_Conditions_Patient_Code']
+  }
+}
+
+Table observations [headercolor: #00696D] {
+  ObservationRowID bigint [pk, increment]
+  DATE datetimeoffset [not null]
+  PATIENT varchar(50) [not null]
+  ENCOUNTER varchar(50) [null]
+  CODE varchar(50) [not null, note: 'LOINC: 4548-4 (HbA1c), 8480-6 (Sys BP), 8462-4 (Dia BP)']
+  DESCRIPTION varchar(300) [null]
+  VALUE varchar(200) [null, note: 'Parsed safely via TRY_CAST in T-SQL views']
+  UNITS varchar(50) [null]
+  TYPE varchar(50) [null]
+
+  indexes {
+    (PATIENT, CODE, DATE) [name: 'IX_Observations_Patient_Code']
+  }
+}
+
+Table medications [headercolor: #00696D] {
+  MedicationRowID bigint [pk, increment]
+  START datetimeoffset [not null]
+  STOP datetimeoffset [null]
+  PATIENT varchar(50) [not null]
+  PAYER varchar(50) [null]
+  ENCOUNTER varchar(50) [null]
+  CODE varchar(50) [not null, note: 'RxNorm']
+  DESCRIPTION varchar(300) [null]
+  BASE_COST decimal(12,2) [null]
+  PAYER_COVERAGE decimal(12,2) [null]
+  DISPENSES int [null]
+  TOTALCOST decimal(12,2) [null]
+  REASONCODE varchar(50) [null]
+  REASONDESCRIPTION varchar(300) [null]
+}
+
+Table sdoh_zip_index [headercolor: #2E7D32] {
+  ZIP varchar(20) [pk, not null]
+  CITY varchar(100) [null]
+  STATE varchar(50) [null]
+  SVI_Score decimal(4,2) [not null, note: '0.00 (Low) to 1.00 (High Vulnerability)']
+  SDOH_Risk_Tier varchar(20) [not null, note: 'Low (<0.40) | Medium (0.40-0.69) | High (>=0.70)']
+  Transit_Barrier_Flag bit [not null, note: '1 when SVI_Score >= 0.65']
+  Food_Desert_Flag bit [not null, note: '1 when SVI_Score >= 0.75']
+  Primary_SDOH_Barrier varchar(100) [not null]
+}
+
+Table phm_config [headercolor: #37474F] {
+  ConfigID int [pk, not null, note: 'Singleton row (CHECK ConfigID = 1)']
+  MeasurementYear int [not null, note: 'Dynamically controls all HEDIS & PHM SQL views']
+}
+
+TableGroup Core_Dimensions {
+  patients
+  providers
+}
+
+TableGroup Clinical_and_Claims_Facts {
+  encounters
+  conditions
+  observations
+  medications
+}
+
+TableGroup SDOH_and_Config {
+  sdoh_zip_index
+  phm_config
+}
+
+Ref FK_Encounters_Patient: encounters.PATIENT > patients.Id
+Ref FK_Encounters_Provider: encounters.PROVIDER > providers.Id
+Ref FK_Conditions_Patient: conditions.PATIENT > patients.Id
+Ref FK_Conditions_Encounter: conditions.ENCOUNTER > encounters.Id
+Ref FK_Observations_Patient: observations.PATIENT > patients.Id
+Ref FK_Medications_Patient: medications.PATIENT > patients.Id
+
+Ref Logical_Observations_Encounter: observations.ENCOUNTER > encounters.Id
+Ref Logical_Medications_Encounter: medications.ENCOUNTER > encounters.Id
+Ref Logical_Patients_SDOH: patients.ZIP > sdoh_zip_index.ZIP

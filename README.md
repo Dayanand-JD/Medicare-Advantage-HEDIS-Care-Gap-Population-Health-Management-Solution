@@ -1,5 +1,3 @@
-# Medicare-Advantage-HEDIS-Care-Gap-Population-Health-Management-Solution
-US Healthcare — Medicare Advantage Quality (NCQA HEDIS / CMS Star Ratings) &amp; Care Management
 # Medicare Advantage HEDIS Care-Gap & Population Health Management (PHM) Solution
 
 ![SQL Server](https://img.shields.io/badge/Database-Microsoft%20SQL%20Server-CC2927?style=flat-square&logo=microsoftsqlserver)
@@ -28,10 +26,10 @@ A regional Medicare Advantage (MA) plan holds a **3.5-Star CMS Rating**, falling
 | Artifact | Purpose | File Link |
 | :--- | :--- | :--- |
 | **Business Requirements Document (BRD)** | Scope, stakeholder personas, NCQA measure specs, 10 Functional Requirements (`FR-01`–`FR-10`), 5 NFRs, 4 Gherkin User Stories, and sign-off | [`01_BA_Documentation/BRD_HEDIS_CareGap_PHM.pdf`](01_BA_Documentation/BRD_HEDIS_CareGap_PHM.pdf) |
-| **Relational ER Diagram** | 8-table SQL Server schema with PK/FK relationships, performance indexes, and SDOH enrichment joins | [`01_BA_Documentation/ER_Diagram_PHM_Schema.png`](01_BA_Documentation/ER_Diagram_PHM_Schema.png) |
-| **UAT Test Suite & Sign-Off Tracker** | 18 test cases (`TC-01`–`TC-18`) mapped 1-to-1 to `FR-01`–`FR-10` with dynamic pass-rate scorecards | [`01_BA_Documentation/UAT_Test_Cases_HEDIS.xlsx`](01_BA_Documentation/UAT_Test_Cases_HEDIS.xlsx) |
+| **Relational ER Diagram** | 8-table SQL Server schema with PK/FK relationships, performance indexes, and SDOH enrichment joins (`.dbml` + `.png`) | [`01_BA_Documentation/ER_Diagram_PHM_Schema.png`](01_BA_Documentation/ER_Diagram_PHM_Schema.png) |
+| **UAT Test Suite & Sign-Off Tracker** | 18 test cases (`TC-01`–`TC-18`) mapped 1-to-1 to `FR-01`–`FR-10` with dynamic pass-rate scorecards & chart | [`01_BA_Documentation/UAT_Test_Cases_HEDIS.xlsx`](01_BA_Documentation/UAT_Test_Cases_HEDIS.xlsx) |
 | **T-SQL Schema & HEDIS Engine** | DDL, dynamic config (`dbo.phm_config`), HEDIS GSD & CBP views, SDOH scoring, and master PHM reporting view | [`02_SQL_Server_Scripts/`](02_SQL_Server_Scripts/) |
-| **3-Page Power BI Dashboard** | Executive Star Rating Simulator, Nurse Care Management Outreach Worklist, and SDOH Equity Analysis | [`03_PowerBI_Dashboard/PHM_HEDIS_Dashboard.pbix`](03_PowerBI_Dashboard/PHM_HEDIS_Dashboard.pbix) |
+| **Power BI Dashboard Kit & DAX** | Complete DAX measures, 500-member synthetic dataset matching `vw_PHM_Member_Summary`, and 3 dashboard layouts | [`03_PowerBI_Dashboard/PowerBI_Build_Guide_and_DAX.md`](03_PowerBI_Dashboard/PowerBI_Build_Guide_and_DAX.md) |
 
 ---
 
@@ -62,31 +60,13 @@ A regional Medicare Advantage (MA) plan holds a **3.5-Star CMS Rating**, falling
 ## Power BI Dashboard Highlights
 
 ### Page 1 — Executive Quality & CMS Star Rating Overview
-* KPI cards for Active Adult Members, GSD & CBP Compliance %, Total Open Care Gaps, and Estimated PMPM Spend.
-* **Interactive DAX What-If Simulator:** Compares live compliance rates against simulated CMS **4-Star (78%)** and **5-Star (85%)** cut-points and dynamically calculates the exact number of member gaps needed to hit target.
-
 ![Executive Quality & Star Rating Dashboard](03_PowerBI_Dashboard/screenshots/page1_executive_stars.png)
 
 ### Page 2 — Care Management Outreach Worklist
-* Operational nurse queue plotting **Annual Claim Spend vs. Open Care Gaps & ED Visits** with slicers for Risk Tier, Measure Status, SDOH Risk, and Attributed PCP.
-* Drill-through member action table surfacing latest HbA1c/BP readings, primary SDOH barrier, and assigned intervention priority.
-
 ![Care Management Outreach Worklist](03_PowerBI_Dashboard/screenshots/page2_care_management_worklist.png)
 
 ### Page 3 — Population Health & SDOH Equity Analysis
-* Geographic concentration of open gaps by City/ZIP alongside compliance disparity comparisons across SDOH Vulnerability Tiers and Age Bands.
-
 ![SDOH Equity Analysis](03_PowerBI_Dashboard/screenshots/page3_sdoh_equity.png)
-
----
-
-## UAT Validation Highlights
-
-All clinical rules and edge cases were validated across **18 structured UAT test cases** (`TC-01`–`TC-18`) covering:
-* **Age Boundaries:** Strictly excluding age 76 from GSD (`TC-01`) and including age 18 (`TC-02`).
-* **Clinical Exclusions:** Removing Hospice, Palliative, ESRD/Dialysis, Pregnancy, Deceased, and Pediatric (`< 18`) records (`TC-03`, `TC-08`, `TC-13`).
-* **NCQA Precision Rules:** Same-day lowest-value tie-breaking (`TC-05`, `TC-10`), rejecting prior-year-only labs (`TC-06`), ignoring pre-diagnosis BP readings (`TC-11`), and rejecting unpaired systolic/diastolic vitals (`TC-12`).
-* **Dynamic Rollover & DAX Accuracy:** Verifying zero hardcoded years via `dbo.phm_config` (`TC-18`) and exact 4-Star gap-to-target math (`TC-17`).
 
 ---
 
@@ -106,9 +86,33 @@ medicare-advantage-hedis-phm-dashboard/
 │   ├── 04_sdoh_enrichment.sql
 │   └── 05_phm_risk_and_outreach_view.sql
 ├── 03_PowerBI_Dashboard/
-│   ├── PHM_HEDIS_Dashboard.pbix
+│   ├── PowerBI_Build_Guide_and_DAX.md
+│   ├── sample_vw_PHM_Member_Summary.csv
 │   └── screenshots/
 │       ├── page1_executive_stars.png
 │       ├── page2_care_management_worklist.png
 │       └── page3_sdoh_equity.png
 └── README.md
+```
+
+---
+
+## How to Reproduce Locally
+
+1. **Download Synthetic US Patient Data:** Download the CSV archive from [Synthea Synthetic Patient Generator](https://synthea.mitre.org/downloads) (1K or 10K sample).
+2. **Initialize Database:** Run `02_SQL_Server_Scripts/01_schema_ddl.sql` in **SQL Server Management Studio (SSMS)**.
+3. **Import CSVs (in FK order):** Load `providers.csv`, `patients.csv`, `encounters.csv`, `conditions.csv`, `observations.csv`, and `medications.csv` into `MedicareAdvantage_PHM`.
+4. **Build Analytics & Views:** Execute scripts `02_hedis_gsd_care_gaps.sql`, `03_hedis_cbp_care_gaps.sql`, `04_sdoh_enrichment.sql`, and `05_phm_risk_and_outreach_view.sql` sequentially.
+5. **Build & Save Power BI Dashboard:** Follow `03_PowerBI_Dashboard/PowerBI_Build_Guide_and_DAX.md` (connecting to `dbo.vw_PHM_Member_Summary` or `sample_vw_PHM_Member_Summary.csv`) and save as `PHM_HEDIS_Dashboard.pbix`.
+
+---
+
+## Author
+
+**Dayanand Jola Dinakar**  
+*Business & Data Analyst | MS in Computer Science (AI Systems & ML Engineering) | MSc in Computing & IT Management*  
+* **Email:** imdayanandjd@gmail.com  
+* **LinkedIn:** [linkedin.com/in/your-profile](https://linkedin.com)  
+* **GitHub:** [github.com/your-username](https://github.com)
+
+> **Data Privacy Notice:** All patient, provider, and claims records used in this repository are 100% synthetic data and contain zero Protected Health Information (PHI).
