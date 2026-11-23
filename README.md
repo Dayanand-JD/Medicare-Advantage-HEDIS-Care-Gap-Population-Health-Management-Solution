@@ -4,7 +4,7 @@
 ![Power BI](https://img.shields.io/badge/BI-Power%20BI%20Desktop-F2C811?style=flat-square&logo=powerbi&logoColor=black)
 ![Domain](https://img.shields.io/badge/Domain-US%20Healthcare%20%7C%20Medicare%20Advantage-004F53?style=flat-square)
 ![Standards](https://img.shields.io/badge/Quality-NCQA%20HEDIS%20%26%20CMS%20Stars-2E7D32?style=flat-square)
-![Role](https://img.shields.io/badge/Role-Business%20Analysis%20%2B%20Data%20Analytics-37474F?style=flat-square)
+
 
 An end-to-end **Business Analysis & Population Health Management (PHM)** solution built for a simulated US Medicare Advantage health plan. This project translates **NCQA HEDIS** technical specifications into a complete **Business Requirements Document (BRD)**, relational **ER Diagram**, **18-scenario UAT test suite**, production **T-SQL care-gap views**, and an interactive **3-page Power BI Care Management Dashboard**.
 
